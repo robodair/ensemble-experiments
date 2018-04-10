@@ -12,3 +12,9 @@ python-dateutil==2.7.0
 pytz==2018.3
 six==1.11.0
 wrapt==1.10.11
+# tensorflow-gpu
+tensorflow
+keras
+pandas
+pytest
+h5py
