@@ -15,17 +15,26 @@ import keras
 import pandas
 
 
-def train(train, test, save_dir, epoch_max, verbose):
+def train(train_path, test_path, save_dir, epoch_max, verbose):
     save_net = save_dir / "net.h5"
-    if not save_net.exists():
+    save_overtrained_net = save_dir / "overtrained_net.h5"
+    if verbose:
+        print(f" Training for {save_net}")
+    if not save_net.exists() or not save_overtrained_net.exists():
+        train = pandas.read_csv(train_path)
+        test = pandas.read_csv(test_path)
         import ensemble_experiments.autotrain as at
-        net = at.autotrain(train, test, min_nodes=1, max_nodes=9, epoch_max=epoch_max, verbose=verbose)
+        net, overtrained_net = at.autotrain(train, test, min_nodes=1, max_nodes=9, epoch_max=epoch_max, verbose=verbose)
         print(f"    SAVING {save_net}")
         net.save(save_net)
+        overtrained_net.save(save_overtrained_net)
         return save_net
     else:
         print(f"    EXISTING {save_net}")
         return save_net
+
+def wrap_train(x):
+    return train(*x)
 
 def main(args):
     print("Running Experiment")
@@ -49,8 +58,10 @@ def main(args):
     test_data.to_csv(ratedir / "initial_test.csv")
     val_data.to_csv(ratedir / "validation.csv")
 
+    all_arguments = []
+
     for num_component_nets in range(1, args.num_nets+1):
-        print(f" BEGIN RUN FOR {num_component_nets} NETS")
+        print(f" GENERATE RUN DATA FOR {num_component_nets} NETS")
         working_dir = ratedir / f"ANNE-{num_component_nets}"
         working_dir.mkdir(exist_ok=True)
         train_test_data = []
@@ -60,29 +71,24 @@ def main(args):
             save_train = save_dir / "train.csv"
             save_test = save_dir / "test.csv"
             save_dir.mkdir(exist_ok=True)
-            if not save_train.exists() and not save_test.exists():
+            if not save_train.exists():
                 train_bag = train_data.sample(len(train_data), replace=True)
+                train_bag.to_csv(save_train)
+            if not save_test.exists():
                 test_bag = test_data.sample(len(test_data), replace=True)
-            else:
-                train_bag = pandas.read_csv(save_train)
-                test_bag = pandas.read_csv(save_test)
-
+                test_bag.to_csv(save_test)
             train_test_data.append((
-                train_bag, test_bag, save_dir
+                save_train, save_test, save_dir
             ))
-            train_bag.to_csv(save_train)
-            test_bag.to_csv(save_test)
 
-        from multiprocessing.pool import Pool
+        all_arguments += [(*x, args.epoch_max, args.verbose) for x in train_test_data]
 
-        def wrap_train(x):
-            return train(*x)
+    from multiprocessing.pool import Pool
+    p = Pool(processes=1)
+    networks = list(map(wrap_train, all_arguments))
 
-        arguments = [(*x, args.epoch_max, args.verbose) for x in train_test_data]
-        networks = list(map(wrap_train, arguments))
-
-        # TODO: Run validation across component networks and aggregate results into predictions, compare with validation (real) classes
-        print(f"Nets for ANNE {num_component_nets}: {networks}")
+    # TODO: Run validation across component networks and aggregate results into predictions, compare with validation (real) classes
+    print(f"Nets for ANNE {num_component_nets}: {networks}")
 
 def setup_parser(parser: argparse.ArgumentParser):
     parser.add_argument("--verbose", action='store_true', help="Show training logs verbosely")

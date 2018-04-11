@@ -9,7 +9,7 @@ from keras.layers import Dense, Activation
 import pandas as pd
 import numpy as np
 
-def epoch_optimise(original_model, max_epochs, train_data, train_classes, test_data, test_classes, compile_args, *, verbose=True, lr=0.1, return_optimum=False):
+def epoch_optimise(original_model, max_epochs, train_data, train_classes, test_data, test_classes, compile_args, *, verbose=True, lr=0.1, return_optimum_and_overtrained=False):
 
     start_time = time.time()
     model = keras.models.clone_model(original_model) # Avoid mutating original
@@ -34,15 +34,15 @@ def epoch_optimise(original_model, max_epochs, train_data, train_classes, test_d
     accuracy = test_accuracies[index]
     accuracy_time = time.time()
     if verbose:
-        print(f"      Accuracy {accuracy * 100:.4f}% at Epoch {index}\n"
-              f"      C: {compile_time - start_time}s, F: {fit_time - compile_time}, A: {accuracy_time - fit_time}s")
+        print(f"        Accuracy {accuracy * 100:.4f}% at Epoch {index}\n"
+              f"        C: {compile_time - start_time}secs, F: {fit_time - compile_time}secs, A: {accuracy_time - fit_time}secs")
 
-    if return_optimum:
+    if return_optimum_and_overtrained:
         # Train model to optimum epochs
         max_accuracy_model = keras.models.clone_model(original_model) # Avoid mutating original
-        model.compile(**compile_args)
-        model.optimizer.lr = lr
-        hist = model.fit(
+        max_accuracy_model.compile(**compile_args)
+        max_accuracy_model.optimizer.lr = lr
+        max_accuracy_model.fit(
             train_data,
             train_classes,
             verbose=0,
@@ -50,10 +50,24 @@ def epoch_optimise(original_model, max_epochs, train_data, train_classes, test_d
             initial_epoch=0,
             batch_size=batch_size
         )
+        overtrained_model = keras.models.clone_model(max_accuracy_model)
+        overtrained_model.compile(**compile_args)
+        overtrained_model.optimizer.lr = lr
+        overtrained_model.set_weights(max_accuracy_model.get_weights())
+        overtrained_model.fit(
+            train_data,
+            train_classes,
+            verbose=0,
+            epochs=index*10, #10x past the optimum number of epochs
+            initial_epoch=index,
+            batch_size=batch_size
+        )
+
     else:
         max_accuracy_model = None
+        overtrained_model = None
 
-    return max_accuracy_model, index, accuracy
+    return max_accuracy_model, overtrained_model, index, accuracy
 
 
 def autotrain(data: pd.DataFrame,
@@ -119,11 +133,11 @@ def autotrain(data: pd.DataFrame,
             Dense(hidden_nodes, input_shape=(inputs,), activation='sigmoid'),
             Dense(outputs, activation='sigmoid')
         ])
-        _, _, accuracy = epoch_optimise(model, epoch_max, train_data, train_classes, test_data, test_classes, compile_args, verbose=verbose)
+        _, _, _, accuracy = epoch_optimise(model, epoch_max, train_data, train_classes, test_data, test_classes, compile_args, verbose=verbose)
         if accuracy > hidden_nodes_max_accuracy:
             best_num_hidden_nodes = hidden_nodes
     if verbose:
-        print(f"Found best hidden nodes {best_num_hidden_nodes}")
+        print(f"    Found best hidden nodes {best_num_hidden_nodes}")
 
     model = Sequential([
         Dense(best_num_hidden_nodes, input_shape=(inputs,), activation='sigmoid'),
@@ -134,20 +148,22 @@ def autotrain(data: pd.DataFrame,
     best_epochs = None
     best_accuracy = 0
     best_model = None
+    best_overtrained_model = None
     for lr in np.concatenate([np.arange(0.1, 0.4, 0.05), np.arange(0.09, 0.04, -0.01)]):
         if verbose:
             print(f"    Testing LR: {lr}")
-        returned_model, epochs, accuracy = epoch_optimise(model, epoch_max, train_data, train_classes, test_data, test_classes, compile_args, verbose=verbose, lr=lr, return_optimum=True)
+        returned_model, overtrained_model, epochs, accuracy = epoch_optimise(model, epoch_max, train_data, train_classes, test_data, test_classes, compile_args, verbose=verbose, lr=lr, return_optimum_and_overtrained=True)
         if accuracy > best_accuracy:
             best_epochs = epochs
             best_accuracy = accuracy
             best_lr = lr
             best_model = returned_model
+            best_overtrained_model = overtrained_model
 
     end_time = time.time()
     if verbose:
-        print(f"    Epoch: {best_epochs}.\n Nodes: {best_num_hidden_nodes},"
-              f"    LR: {best_lr:.4f}, Acc: {best_accuracy:.4f}\n"
-              f"    Time {end_time - start_time}s")
+        print(f"  Epoch: {best_epochs}.\n Nodes: {best_num_hidden_nodes},"
+              f"  LR: {best_lr:.4f}, Acc: {best_accuracy:.4f}\n"
+              f"  Time {end_time - start_time}s")
 
-    return best_model
+    return best_model, overtrained_model
