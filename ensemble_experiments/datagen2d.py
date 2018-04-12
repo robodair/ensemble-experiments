@@ -4,7 +4,6 @@ Utilities for generating and visualising 2D datasets
 Discriminator of these datasets is fixed to 'y = 0.2 * (1 + cos(7 * pi * x)) + 0.65 * x^2'
 """
 
-
 import sys
 import argparse
 import csv
@@ -14,51 +13,36 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import matplotlib
-matplotlib.use('TKAgg')
-import matplotlib.pyplot as pyplot
-
 CLASS_A = 0
 CLASS_B = 1
 
-def make_plot(data):
-    """
-    Create a plot of the data and display it
-    """
-    t = np.arange(0, 1, 0.01)
-    s = discriminator(t)
-    # Plot Discriminator
-    pyplot.plot(t, s)
 
-    # Class A points
-    pyplot.scatter(
-        data.loc[data['class'] == CLASS_A, 'x'],
-        data.loc[data['class'] == CLASS_A, 'y'],
-        c="red", marker='.'
-    )
-
-    # Class B points
-    pyplot.scatter(
-        data.loc[data['class'] == CLASS_B, 'x'],
-        data.loc[data['class'] == CLASS_B, 'y'],
-        c="green", marker='.'
-    )
-
-    # Incorrectly labelled points
-    pyplot.scatter(
-        data.loc[data['class'] != data['realclass'], 'x'],
-        data.loc[data['class'] != data['realclass'], 'y'],
-        c="purple", marker='.'
-    )
-
-    pyplot.show()
-
+from ensemble_experiments.plotutils import make_plot
 
 def discriminator(x):
     """
     Discriminator of y = 0.2 * (1 + cos(7 * pi * x)) + 0.65 * x^2
     """
     return 0.2 * (1 + np.cos(7 * np.pi * x)) + 0.65 * np.power(x, 2)
+
+
+def generate_visualization_data():
+    data = pd.DataFrame()
+    x = np.array([])
+    y = np.array([])
+
+    for xval in np.arange(0, 1, 1/100):
+        for yval in np.arange(0, 1, 1/100):
+            x = np.append(x, xval)
+            y = np.append(y, yval)
+    data['x'] = x
+    data['y'] = y
+    comp = discriminator(data['x'])
+    data['realclass'] = None
+    data.loc[data['y'] > comp, 'realclass'] = CLASS_A
+    data.loc[data['y'] < comp, 'realclass'] = CLASS_B
+
+    return data
 
 
 def generate_data(count: int, error: int, seed: int) -> pd.DataFrame:
@@ -102,7 +86,7 @@ def main(args):
     data = generate_data(args.count, args.error, args.seed)
 
     if args.plot:
-        make_plot(data)
+        make_plot(data, show=True)
 
     if args.save_file:
         data.to_csv(args.save_file)
