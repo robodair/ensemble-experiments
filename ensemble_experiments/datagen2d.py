@@ -16,9 +16,6 @@ import pandas as pd
 CLASS_A = 0
 CLASS_B = 1
 
-
-from ensemble_experiments.plotutils import make_plot
-
 def discriminator(x):
     """
     Discriminator of y = 0.2 * (1 + cos(7 * pi * x)) + 0.65 * x^2
@@ -86,6 +83,7 @@ def main(args):
     data = generate_data(args.count, args.error, args.seed)
 
     if args.plot:
+        from ensemble_experiments.plotutils import make_plot
         make_plot(data, show=True)
 
     if args.save_file:

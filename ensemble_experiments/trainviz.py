@@ -56,14 +56,16 @@ def main(args):
         callbacks=[PlotDiscriminatorCallback()]
     )
 
+    input("Done, press enter to close")
+
 def setup_parser(parser: argparse.ArgumentParser):
     parser.add_argument("--verbose", type=int, help="Show training logs verbosely", default=0)
-    parser.add_argument("--epochs", type=int, help="Maximum epochs to test to", default=50000)
-    parser.add_argument("--plot-delta", type=int, help="Plot after this many epochs", default=5000)
+    parser.add_argument("--epochs", type=int, help="Maximum epochs to test to", default=100000)
+    parser.add_argument("--plot-delta", type=int, help="Plot after this many epochs", default=1000)
     parser.add_argument("--error-rate", type=int, help="Error rate to use", default=10)
     parser.add_argument("--data-size", type=int, help="Size of train/test dataset", default=300)
-    parser.add_argument("-lr", "--learn-rate", type=float, help="Learning Rate to Use", default=0.2)
-    parser.add_argument("--hidden-nodes", type=int, help="Num Hidden Nodes", default=12)
+    parser.add_argument("-lr", "--learn-rate", type=float, help="SGD Learning Rate to use", default=0.9)
+    parser.add_argument("--hidden-nodes", type=int, help="Num Hidden Nodes", default=20)
     parser.add_argument("--seed", type=int, help="Seed for dataset generation", default=9)
 
     parser.set_defaults(func=main)
