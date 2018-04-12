@@ -24,14 +24,15 @@ def train(train_path, test_path, save_dir, epoch_max, verbose):
         train = pandas.read_csv(train_path)
         test = pandas.read_csv(test_path)
         import ensemble_experiments.autotrain as at
-        net, overtrained_net = at.autotrain(train, test, min_nodes=1, max_nodes=9, epoch_max=epoch_max, verbose=verbose)
+        net, overtrained_net = at.autotrain(train, test, min_nodes=1, max_nodes=9,
+            max_epochs=epoch_max, verbose=verbose)
         print(f"    SAVING {save_net}")
         net.save(save_net)
         overtrained_net.save(save_overtrained_net)
-        return save_net
+        return save_net, save_overtrained_net
     else:
         print(f"    EXISTING {save_net}")
-        return save_net
+        return save_net, save_overtrained_net
 
 def wrap_train(x):
     return train(*x)
@@ -48,15 +49,23 @@ def main(args):
     ratedir = exdir / f"error-{args.error_rate}"
     ratedir.mkdir(exist_ok=True)
 
-    data = dg.generate_data(args.data_size, args.error_rate, 2017)
+    data_csv = ratedir / "data.csv"
+    if not data_csv.exists():
+        data = dg.generate_data(args.data_size, args.error_rate, 2017)
+        data.to_csv(data_csv)
+    else:
+        data = pandas.read_csv(data_csv)
+
+    val_data_csv = ratedir / "validation.csv"
+    if not val_data_csv.exists():
+        val_data = dg.generate_data(1000, args.error_rate, 2018)
+        val_data.to_csv(val_data_csv)
+    else:
+        val_data = pandas.read_csv(val_data_csv)
+
+
     train_data = data[::2]
     test_data = data[1::2]
-
-    val_data = dg.generate_data(1000, args.error_rate, 2018)
-
-    train_data.to_csv(ratedir / "initial_train.csv")
-    test_data.to_csv(ratedir / "initial_test.csv")
-    val_data.to_csv(ratedir / "validation.csv")
 
     all_arguments = []
 
@@ -84,14 +93,37 @@ def main(args):
         all_arguments += [(*x, args.epoch_max, args.verbose) for x in train_test_data]
 
     from multiprocessing.pool import Pool
-    p = Pool(processes=1)
-    networks = list(map(wrap_train, all_arguments))
+    p = Pool(processes=8)
+    network_paths = p.map(wrap_train, all_arguments)
 
-    # TODO: Run validation across component networks and aggregate results into predictions, compare with validation (real) classes
-    print(f"Nets for ANNE {num_component_nets}: {networks}")
+    # TODO: Run validation across component networks and aggregate results into predictions
+    # compare with validation (real) classes
+    print(f"Nets for ANNE: {network_paths}")
+
+    val_data_input = val_data.as_matrix(columns=('x', 'y'))
+    val_data_classes = val_data["realclass"].values
+    for net_path, overtrained_path in network_paths:
+        op_model = keras.models.load_model(net_path)
+        res = op_model.evaluate(
+            val_data_input,
+            val_data_classes,
+            verbose=1
+        )
+        print(op_model.metrics_names)
+        print(res)
+        ot_model = keras.models.load_model(overtrained_path)
+        res = ot_model.evaluate(
+            val_data_input,
+            val_data_classes,
+            verbose=1
+        )
+        print(op_model.metrics_names)
+        print(res)
+
+
 
 def setup_parser(parser: argparse.ArgumentParser):
-    parser.add_argument("--verbose", action='store_true', help="Show training logs verbosely")
+    parser.add_argument("--verbose", type=int, help="Show training logs verbosely", default=0)
     parser.add_argument("--epoch-max", type=int, help="Maximum epochs to test to", default=1500)
     parser.add_argument("--error-rate", type=int, help="Error rate to use", default=10)
     parser.add_argument("--data-size", type=int, help="Size of train/test dataset", default=300)
