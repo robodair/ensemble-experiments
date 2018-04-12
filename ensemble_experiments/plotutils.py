@@ -42,7 +42,7 @@ def make_plot(data, show=True):
     if show:
         pyplot.show()
 
-def plot_discriminator_visualisation(vis_data, train_data):
+def plot_discriminator_visualisation(vis_data, train_data=None):
     pyplot.clf()
     # Plot data
     # Class A points
@@ -63,5 +63,6 @@ def plot_discriminator_visualisation(vis_data, train_data):
     pyplot.ion()
     pyplot.show()
     pyplot.draw()
-    make_plot(train_data, show=False)
+    if train_data is not None:
+        make_plot(train_data, show=False)
     pyplot.pause(0.1)
