@@ -6,6 +6,7 @@ import os
 # No verbose logging from TF
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"
 
+import time
 
 import argparse
 import signal
@@ -14,40 +15,99 @@ from pathlib import Path
 import pandas
 
 
-def train(train_path, test_path, save_dir, epoch_max, verbose):
+def train(train_df, test_df, save_dir, epochs, verbose):
     save_net = save_dir / "net.h5"
     save_overtrained_net = save_dir / "overtrained_net.h5"
-    if verbose:
-        print(f" Training for {save_net}")
-    if not save_net.exists() or not save_overtrained_net.exists():
-        train = pandas.read_csv(train_path)
-        test = pandas.read_csv(test_path)
-        import ensemble_experiments.autotrain as at
-        net, overtrained_net = at.autotrain(train, test, min_nodes=1, max_nodes=9,
-            max_epochs=epoch_max, verbose=verbose)
-        print(f"    SAVING {save_net}")
-        net.save(save_net)
-        overtrained_net.save(save_overtrained_net)
-        return save_net, save_overtrained_net
+
+    import keras
+    from keras.callbacks import EarlyStopping
+    from keras.models import Sequential, load_model
+    from keras.layers import Dense
+    from keras.optimizers import SGD
+
+    print(f"Training for {save_net}")
+    start_time = time.time()
+
+    if save_net.exists() and save_overtrained_net.exists():
+        net = load_model(save_net)
+        ot_net = load_model(save_overtrained_net)
     else:
-        print(f"    EXISTING {save_net}")
-        return save_net, save_overtrained_net
+
+        train_classes = train_df["class"].values
+        test_classes = test_df["class"].values
+        train_data = train_df.as_matrix(columns=("x", "y"))
+        test_data = test_df.as_matrix(columns=("x", "y"))
+
+        stopper = EarlyStopping(
+            monitor="val_acc",
+            patience=2000,
+            verbose=verbose,
+        )
+
+        model = Sequential([
+            Dense(20, input_shape=(2,), activation="sigmoid"),
+            Dense(1, activation="sigmoid")
+        ])
+
+        model.compile(
+            loss="binary_crossentropy",
+            optimizer=SGD(lr=0.8),
+            metrics=["accuracy"]
+        )
+
+        hist = model.fit(
+            train_data,
+            train_classes,
+            verbose=verbose,
+            epochs=epochs,
+            validation_data=(test_data, test_classes),
+            callbacks=[stopper]
+        )
+        model.save(save_net)
+
+        op_epochs = len(hist.epoch)
+        ot_epochs = op_epochs * 10
+
+        print(f"Trained to {op_epochs} epochs as determined by early exit, saved to {save_net}\n"
+              f"Beginning overtrain to {ot_epochs} epochs")
+
+        train_time = time.time()
+        print(f">> Train Time: {train_time-start_time:.2f} seconds")
+
+        model.fit(
+            train_data,
+            train_classes,
+            verbose=verbose,
+            epochs=ot_epochs,
+            initial_epoch=op_epochs,
+            validation_data=(test_data, test_classes)
+        )
+        model.save(save_overtrained_net)
+
+        print(f"Overtrained to {ot_epochs} epochs, saved to {save_overtrained_net}")
+
+        end_time = time.time()
+        print(f">> Overtrain Time: {end_time-train_time:.2f} seconds")
+        print(f">>>> Total Time: {end_time-start_time:.2f} seconds")
+
+    return {
+        "net": keras.models.load_model(save_net),
+        "ot_net": keras.models.load_model(save_overtrained_net)
+    }
 
 def wrap_train(x):
     return train(*x)
 
 def main(args):
     print("Running Experiment")
-    np.random.seed(2000)
+
+    np.random.seed(2000) # Attempt to make experiment reproducible
     import keras
     import ensemble_experiments.datagen2d as dg
 
-    exdir = Path(f"{args.prefix}experiment-EPOCH_MAX={args.epoch_max}-DATA_SIZE={args.data_size}")
-    exdir.mkdir(exist_ok=True)
-
     print(f"BEGIN RUN FOR ERROR RATE {args.error_rate}%")
-    ratedir = exdir / f"error-{args.error_rate}"
-    ratedir.mkdir(exist_ok=True)
+    ratedir = args.save_dir / f"error-{args.error_rate}"
+    ratedir.mkdir(exist_ok=True, parents=True)
 
     data_csv = ratedir / "data.csv"
     if not data_csv.exists():
@@ -63,70 +123,74 @@ def main(args):
     else:
         val_data = pandas.read_csv(val_data_csv)
 
-
     train_data = data[::2]
     test_data = data[1::2]
 
-    all_arguments = []
+    nets = []
 
-    for num_component_nets in range(1, args.num_nets+1):
-        print(f" GENERATE RUN DATA FOR {num_component_nets} NETS")
-        working_dir = ratedir / f"ANNE-{num_component_nets}"
+    for net_number in range(1, args.num_nets + 1):
+        print(f"GENERATE DATA FOR {net_number}")
+        working_dir = ratedir / f"ANN-{net_number}"
         working_dir.mkdir(exist_ok=True)
-        train_test_data = []
-        # Generate num_component_nets bags of data and train networks
-        for i in range(num_component_nets):
-            save_dir = working_dir / f"net-{i}"
-            save_train = save_dir / "train.csv"
-            save_test = save_dir / "test.csv"
-            save_dir.mkdir(exist_ok=True)
-            if not save_train.exists():
-                train_bag = train_data.sample(len(train_data), replace=True)
-                train_bag.to_csv(save_train)
-            if not save_test.exists():
-                test_bag = test_data.sample(len(test_data), replace=True)
-                test_bag.to_csv(save_test)
-            train_test_data.append((
-                save_train, save_test, save_dir
-            ))
 
-        all_arguments += [(*x, args.epoch_max, args.verbose) for x in train_test_data]
+        save_train = working_dir / "train.csv"
+        save_test = working_dir / "test.csv"
+        working_dir.mkdir(exist_ok=True)
+        if save_train.exists():
+            train_bag = pandas.read_csv(save_train)
+        else:
+            train_bag = train_data.sample(len(train_data), replace=True)
+            train_bag.to_csv(save_train)
+        if save_test.exists():
+            test_bag = pandas.read_csv(save_test)
+        else:
+            test_bag = test_data.sample(len(test_data), replace=True)
+            test_bag.to_csv(save_test)
 
-    from multiprocessing.pool import Pool
-    p = Pool(processes=8)
-    network_paths = p.map(wrap_train, all_arguments)
+        print(f"BEGIN TRAINING FOR {net_number}")
+        nets.append(train(train_bag, test_bag, working_dir, args.epochs, args.verbose))
+
+
+    # Work out which ANN's to use for each ANNE
 
     # TODO: Run validation across component networks and aggregate results into predictions
     # compare with validation (real) classes
-    print(f"Nets for ANNE: {network_paths}")
+    # print(f"Nets for ANNE: {network_paths}")
 
-    val_data_input = val_data.as_matrix(columns=('x', 'y'))
-    val_data_classes = val_data["realclass"].values
-    for net_path, overtrained_path in network_paths:
-        op_model = keras.models.load_model(net_path)
-        res = op_model.evaluate(
-            val_data_input,
-            val_data_classes,
-            verbose=1
-        )
-        print(op_model.metrics_names)
-        print(res)
-        ot_model = keras.models.load_model(overtrained_path)
-        res = ot_model.evaluate(
-            val_data_input,
-            val_data_classes,
-            verbose=1
-        )
-        print(op_model.metrics_names)
-        print(res)
+    # val_data_input = val_data.as_matrix(columns=('x', 'y'))
+    # val_data_classes = val_data["realclass"].values
+    # for net_path, overtrained_path in network_paths:
+    #     op_model = keras.models.load_model(net_path)
+    #     res = op_model.evaluate(
+    #         val_data_input,
+    #         val_data_classes,
+    #         verbose=1
+    #     )
+    #     print(op_model.metrics_names)
+    #     print(res)
+    #     ot_model = keras.models.load_model(overtrained_path)
+    #     res = ot_model.evaluate(
+    #         val_data_input,
+    #         val_data_classes,
+    #         verbose=1
+    #     )
+    #     print(op_model.metrics_names)
+    #     print(res)
 
 
 
 def setup_parser(parser: argparse.ArgumentParser):
-    parser.add_argument("--verbose", type=int, help="Show training logs verbosely", default=0)
-    parser.add_argument("--epoch-max", type=int, help="Maximum epochs to test to", default=1500)
-    parser.add_argument("--error-rate", type=int, help="Error rate to use", default=10)
-    parser.add_argument("--data-size", type=int, help="Size of train/test dataset", default=300)
-    parser.add_argument("--prefix", help="Prefix for the experiment folder", default="")
-    parser.add_argument("--num-nets", type=int, help="Number of component nets to do the experiment to", default=99)
+    parser.add_argument("save_dir",
+                        help="Directory in which to save experiment files", type=Path)
+    parser.add_argument("-v", "--verbose",
+                        type=int, help="Show training logs verbosely", default=0)
+    parser.add_argument("-e", "--epochs",
+                        type=int, help="Maximum epochs to early exit train to", default=20000)
+    parser.add_argument("-r", "--error-rate",
+                        type=int, help="Data error rate to use", default=10)
+    parser.add_argument("-d", "--data-size",
+                        type=int, help="Size of train/test dataset", default=300)
+    parser.add_argument("-c", "--num-nets",
+                        type=int, help="Number of component nets to do the experiment to",
+                        default=99)
     parser.set_defaults(func=main)
