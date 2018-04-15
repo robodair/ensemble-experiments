@@ -5,7 +5,7 @@ Discriminator of these datasets is fixed to 'y = 0.2 * (1 + cos(7 * pi * x)) + 0
 """
 
 import sys
-import argparse
+
 import csv
 from typing import Tuple
 from pathlib import Path
@@ -18,12 +18,16 @@ CLASS_B = 1
 
 def discriminator(x):
     """
-    Discriminator of y = 0.2 * (1 + cos(7 * pi * x)) + 0.65 * x^2
+    Discriminator of y = 0.1 * ( 2.5 + cos( 3 * pi * x) ) + 0.5 * x^2
     """
-    return 0.2 * (1 + np.cos(7 * np.pi * x)) + 0.65 * np.power(x, 2)
+    return 0.1 * ( 2.5 + np.cos( 3 * np.pi * x) ) + 0.5 * np.power(x, 2)
 
 
-def generate_visualization_data():
+def generate_uniform_data():
+    """
+    Generate a uniform dataset with points every 0.01 spaces
+    Used when plitting to visualise the discriminator
+    """
     data = pd.DataFrame()
     x = np.array([])
     y = np.array([])
@@ -79,33 +83,3 @@ def generate_data(count: int, error: int, seed: int) -> pd.DataFrame:
     return data
 
 
-def main(args):
-    data = generate_data(args.count, args.error, args.seed)
-
-    if args.plot:
-        from ensemble_experiments.plotutils import make_plot
-        make_plot(data, show=True)
-
-    if args.save_file:
-        data.to_csv(args.save_file)
-
-
-def setup_parser(parser: argparse.ArgumentParser):
-    parser.add_argument("count",
-                        type=int,
-                        help="Integer, Number of datapoints to produce")
-    parser.add_argument("error",
-                        type=int,
-                        help="Integer, Percentage of data points to incorrectly classify")
-    parser.add_argument("--plot",
-                        default=False,
-                        action="store_true",
-                        help="Visualize the dataset by plotting it")
-    parser.add_argument("--seed", type=int,
-                        default=2018,
-                        help="Random seed to use for Numpy")
-    parser.add_argument("--save-file",
-                        default=None,
-                        type=Path,
-                        help="Save data to specified file in csv format")
-    parser.set_defaults(func=main)

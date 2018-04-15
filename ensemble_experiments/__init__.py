@@ -1,6 +1,9 @@
 import argparse
 
-from ensemble_experiments import datagen2d, experiment2d, trainviz
+import matplotlib
+matplotlib.use('TKAgg')
+
+from ensemble_experiments import dataviz, experiment2d, trainviz
 
 def main():
     """
@@ -9,8 +12,8 @@ def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
 
-    datagen_parser = subparsers.add_parser("datagen")
-    datagen2d.setup_parser(datagen_parser)
+    dataviz_parser = subparsers.add_parser("dataviz")
+    dataviz.setup_parser(dataviz_parser)
 
     experiment2d_parser = subparsers.add_parser("ex2d")
     experiment2d.setup_parser(experiment2d_parser)

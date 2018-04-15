@@ -11,7 +11,6 @@ import argparse
 import signal
 import numpy as np
 from pathlib import Path
-import keras
 import pandas
 
 
@@ -40,6 +39,7 @@ def wrap_train(x):
 def main(args):
     print("Running Experiment")
     np.random.seed(2000)
+    import keras
     import ensemble_experiments.datagen2d as dg
 
     exdir = Path(f"{args.prefix}experiment-EPOCH_MAX={args.epoch_max}-DATA_SIZE={args.data_size}")
