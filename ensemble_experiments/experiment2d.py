@@ -21,17 +21,16 @@ def train(train_df, test_df, save_dir, epochs, verbose):
 
     import keras
     from keras.callbacks import EarlyStopping
-    from keras.models import Sequential, load_model
+    from keras.models import Sequential
     from keras.layers import Dense
     from keras.optimizers import SGD
 
-    print(f"Training for {save_net}")
     start_time = time.time()
 
     if save_net.exists() and save_overtrained_net.exists():
-        net = load_model(save_net)
-        ot_net = load_model(save_overtrained_net)
+        print(f"Models already exist for {save_net}")
     else:
+        print(f"Training for {save_net}")
 
         train_classes = train_df["class"].values
         test_classes = test_df["class"].values
@@ -91,8 +90,8 @@ def train(train_df, test_df, save_dir, epochs, verbose):
         print(f">>>> Total Time: {end_time-start_time:.2f} seconds")
 
     return {
-        "net": keras.models.load_model(save_net),
-        "ot_net": keras.models.load_model(save_overtrained_net)
+        "net": save_net,
+        "ot_net": save_overtrained_net
     }
 
 def wrap_train(x):
@@ -101,8 +100,6 @@ def wrap_train(x):
 def main(args):
     print("Running Experiment")
 
-    np.random.seed(2000) # Attempt to make experiment reproducible
-    import keras
     import ensemble_experiments.datagen2d as dg
 
     print(f"BEGIN RUN FOR ERROR RATE {args.error_rate}%")
@@ -126,10 +123,10 @@ def main(args):
     train_data = data[::2]
     test_data = data[1::2]
 
-    nets = []
+    nets = [] # list of dicts of paths to load
 
     for net_number in range(1, args.num_nets + 1):
-        print(f"GENERATE DATA FOR {net_number}")
+        print(f"GET DATA FOR {net_number}")
         working_dir = ratedir / f"ANN-{net_number}"
         working_dir.mkdir(exist_ok=True)
 
@@ -147,7 +144,7 @@ def main(args):
             test_bag = test_data.sample(len(test_data), replace=True)
             test_bag.to_csv(save_test)
 
-        print(f"BEGIN TRAINING FOR {net_number}")
+        print(f"GET NETWORK FOR {net_number}")
         nets.append(train(train_bag, test_bag, working_dir, args.epochs, args.verbose))
 
 
@@ -191,6 +188,6 @@ def setup_parser(parser: argparse.ArgumentParser):
     parser.add_argument("-d", "--data-size",
                         type=int, help="Size of train/test dataset", default=300)
     parser.add_argument("-c", "--num-nets",
-                        type=int, help="Number of component nets to do the experiment to",
-                        default=99)
+                        type=int, help="Size of component network pool",
+                        default=300)
     parser.set_defaults(func=main)
