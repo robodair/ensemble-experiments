@@ -15,7 +15,7 @@ from pathlib import Path
 import pandas
 
 
-def train(train_df, test_df, save_dir, epochs, verbose):
+def train(train_df, test_df, save_dir, epochs, verbose, net_number):
     save_net = save_dir / "net.h5"
     save_overtrained_net = save_dir / "overtrained_net.h5"
 
@@ -90,6 +90,8 @@ def train(train_df, test_df, save_dir, epochs, verbose):
         print(f">>>> Total Time: {end_time-start_time:.2f} seconds")
 
     return {
+        "id": net_number,
+        "dir": save_dir,
         "net": save_net,
         "ot_net": save_overtrained_net
     }
@@ -145,7 +147,38 @@ def main(args):
             test_bag.to_csv(save_test)
 
         print(f"GET NETWORK FOR {net_number}")
-        nets.append(train(train_bag, test_bag, working_dir, args.epochs, args.verbose))
+        nets.append(train(train_bag, test_bag, working_dir, args.epochs, args.verbose, net_number))
+
+    # Run validation data through each net and save predictions for later analysis
+    from keras.models import load_model
+    val_data_xy = val_data.as_matrix(columns=('x', 'y'))
+
+    for net_dict in nets:
+        validation_predictions_file = net_dict["dir"] / "val_predictions.csv"
+        ot_validation_predictions_file = net_dict["dir"] / "overtrained_val_predictions.csv"
+
+        if not validation_predictions_file.exists() or not ot_validation_predictions_file.exists():
+            net = load_model(net_dict["net"])
+            predictions = pandas.DataFrame(
+                data=net.predict_classes(val_data_xy),
+                columns=(f"ANN-{net_dict['id']}",)
+            )
+            predictions.to_csv(validation_predictions_file)
+            print(f"Saved Predictions for ANN {net_dict['id']} to {validation_predictions_file}")
+            del net
+            del predictions
+
+            ot_net = load_model(net_dict["ot_net"])
+            ot_predictions = pandas.DataFrame(
+                data=ot_net.predict_classes(val_data_xy),
+                columns=(f"ot-ANN-{net_dict['id']}",)
+            )
+            ot_predictions.to_csv(ot_validation_predictions_file)
+            print(f"Saved OT Predictions for OT ANN {net_dict['id']} to {ot_validation_predictions_file}")
+            del ot_net
+            del ot_predictions
+        else:
+            print(f"Already have predictions for ANN {net_dict['id']}")
 
 
     # Work out which ANN's to use for each ANNE
