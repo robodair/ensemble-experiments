@@ -10,6 +10,7 @@ Experiment 1:
 3000 Validation points
 2000 patience
 ee ex2d experiment-1 -r {10,20,30,40}
+~1 Day train time if all error rates run in parallel
 
 Experiment 2:
 120 Data points
@@ -17,7 +18,8 @@ Experiment 2:
 9 Hidden nodes
 3000 Validation points
 2000 patience
-ee ex2d experiment-1 -d 120 -l 0.2 --hidden-nodes 9 -r {10,20,30,40}
+ee ex2d experiment-2 -d 120 -l 0.2 --hidden-nodes 9 -r {10,20,30,40}
+~1 Day train time if all error rates run in parallel
 
 Experiment 3:
 300 Data points
@@ -25,4 +27,5 @@ Experiment 3:
 20 Hidden nodes
 3000 Validation points
 5000 patience
-ee ex2d experiment-1 -l 0.2 -p 5000 -r {10,20,30,40}
+ee ex2d experiment-3 -l 0.2 -p 5000 -r {10,20,30,40}
+~1.5-2 Days train time if all error rates run in parallel
