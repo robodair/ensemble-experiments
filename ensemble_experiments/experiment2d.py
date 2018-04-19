@@ -37,7 +37,7 @@ def entropy_variance(stats: pandas.DataFrame, L: int):
     return E
 
 
-def train(train_df, test_df, save_dir, epochs, verbose, net_number):
+def train(train_df, test_df, save_dir, epochs, verbose, net_number, learn_rate):
     save_net = save_dir / "net.h5"
     save_overtrained_net = save_dir / "overtrained_net.h5"
 
@@ -72,7 +72,7 @@ def train(train_df, test_df, save_dir, epochs, verbose, net_number):
 
         model.compile(
             loss="binary_crossentropy",
-            optimizer=SGD(lr=0.8),
+            optimizer=SGD(lr=learn_rate),
             metrics=["accuracy"]
         )
 
@@ -119,10 +119,6 @@ def train(train_df, test_df, save_dir, epochs, verbose, net_number):
         "net": save_net,
         "ot_net": save_overtrained_net
     }
-
-
-def wrap_train(x):
-    return train(*x)
 
 
 def main(args):
@@ -173,7 +169,10 @@ def main(args):
             test_bag.to_csv(save_test)
 
         print(f"GET NETWORK FOR {net_number}")
-        nets.append(train(train_bag, test_bag, working_dir, args.epochs, args.verbose, net_number))
+        nets.append(
+            train(train_bag, test_bag, working_dir, args.epochs,
+                  args.verbose, net_number, args.learn_rate)
+        )
 
     # Run validation data through each net and save predictions for later analysis
     from keras.models import load_model
@@ -208,7 +207,7 @@ def main(args):
 
     all_stats = []
     # Work out which ANN's to use for each ANNE
-    annes_stats_file = ratedir / "ann_stats.csv"
+    annes_stats_file = ratedir / "anne_stats.csv"
     if not annes_stats_file.exists():
         for anne_number in range(1, args.num_ensembles+1):
         # for anne_number in range(45, args.num_ensembles+1):
@@ -307,4 +306,7 @@ def setup_parser(parser: argparse.ArgumentParser):
     parser.add_argument("-z", "--val-data-size",
                         type=int, help="Number of points to use for validation",
                         default=3000)
+    parser.add_argument("-l", "--learn-rate",
+                        type=float, help="Network learn rate",
+                        default=0.8)
     parser.set_defaults(func=main)
