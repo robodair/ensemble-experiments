@@ -7,12 +7,34 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"
 
 import time
+import random
 
 import argparse
 import signal
 import numpy as np
 from pathlib import Path
 import pandas
+
+from ensemble_experiments.datagen2d import CLASS_A, CLASS_B
+
+def entropy_variance(stats: pandas.DataFrame, L: int):
+    """
+    Entropy Measure for Variance
+
+    Parameters:
+        stats: DataFrame with 'correct_count' and 'incorrect_count' columns detailing the number of
+            networks that correctly and incorrectly classified each validation point respectively
+        L: The number of networks in the ensemble
+    """
+    if L == 1:
+        return 0
+    N = len(stats)
+    minimum_counts = stats.loc[:, ('correct_count', 'incorrect_count')].min(axis=1)
+    coeff = 1/(L - np.ceil(L / 2))
+    mult = coeff * minimum_counts
+    summation = mult.sum()
+    E = summation / N
+    return E
 
 
 def train(train_df, test_df, save_dir, epochs, verbose, net_number):
@@ -98,8 +120,10 @@ def train(train_df, test_df, save_dir, epochs, verbose, net_number):
         "ot_net": save_overtrained_net
     }
 
+
 def wrap_train(x):
     return train(*x)
+
 
 def main(args):
     print("Running Experiment")
@@ -119,7 +143,7 @@ def main(args):
 
     val_data_csv = ratedir / "validation.csv"
     if not val_data_csv.exists():
-        val_data = dg.generate_data(1000, args.error_rate, 2018)
+        val_data = dg.generate_data(args.val_data_size, args.error_rate, 2018)
         val_data.to_csv(val_data_csv)
     else:
         val_data = pandas.read_csv(val_data_csv)
@@ -182,32 +206,84 @@ def main(args):
         # Avoid Memory Leak https://github.com/keras-team/keras/issues/2102
         keras.backend.clear_session()
 
-
+    all_stats = []
     # Work out which ANN's to use for each ANNE
+    annes_stats_file = ratedir / "ann_stats.csv"
+    if not annes_stats_file.exists():
+        for anne_number in range(1, args.num_ensembles+1):
+        # for anne_number in range(45, args.num_ensembles+1):
+            print(f"Producing stats for EarlyExit and Overtrained ANNE {anne_number}")
+            # Select the networks to use (e.g. for ANNE 4 choose 4 random numbers between 1 and args.num_nets)
+            net_predictions = pandas.DataFrame()
+            ot_net_predictions = pandas.DataFrame()
+            # for simplicity, truth dataframe column names match prediction column names
+            truth = pandas.DataFrame()
+            ot_truth = pandas.DataFrame()
 
-    # TODO: Run validation across component networks and aggregate results into predictions
-    # compare with validation (real) classes
-    # print(f"Nets for ANNE: {network_paths}")
+            chosen_components_file = ratedir / f"anne-{anne_number}-component-nets.csv"
+            if chosen_components_file.exists():
+                anne_components = pandas.read_csv(chosen_components_file)['nets']
+            else:
+                df = pandas.DataFrame({
+                    'nets': random.sample(range(1, args.num_nets + 1), anne_number)
+                })
+                df.to_csv(chosen_components_file)
+                anne_components = df['nets']
 
-    # val_data_input = val_data.as_matrix(columns=('x', 'y'))
-    # val_data_classes = val_data["realclass"].values
-    # for net_path, overtrained_path in network_paths:
-    #     op_model = keras.models.load_model(net_path)
-    #     res = op_model.evaluate(
-    #         val_data_input,
-    #         val_data_classes,
-    #         verbose=1
-    #     )
-    #     print(op_model.metrics_names)
-    #     print(res)
-    #     ot_model = keras.models.load_model(overtrained_path)
-    #     res = ot_model.evaluate(
-    #         val_data_input,
-    #         val_data_classes,
-    #         verbose=1
-    #     )
-    #     print(op_model.metrics_names)
-    #     print(res)
+            for net_number in anne_components:
+
+                net_name = f"ANN-{net_number}"
+                ot_net_name = f"ot-ANN-{net_number}"
+                directory = ratedir / net_name
+                validation_predictions_file = directory / "val_predictions.csv"
+                ot_validation_predictions_file = directory / "overtrained_val_predictions.csv"
+
+                net_predictions[net_name] = pandas.read_csv(
+                    validation_predictions_file)[net_name]
+                truth[net_name] = val_data["realclass"]
+                ot_net_predictions[ot_net_name] = pandas.read_csv(
+                    ot_validation_predictions_file)[ot_net_name]
+                ot_truth[ot_net_name] = val_data["realclass"]
+
+            # Prediction Info
+            anne_prediction_stats = pandas.DataFrame({
+                "anne_prediction": net_predictions.mode(axis=1)[0].astype(int),
+                "correct_count": (net_predictions == truth).sum(axis=1),
+                "incorrect_count": (net_predictions != truth).sum(axis=1),
+            })
+
+            anne_ot_prediction_stats = pandas.DataFrame({
+                "anne_prediction": ot_net_predictions.mode(axis=1)[0].astype(int),
+                "correct_count": (ot_net_predictions == ot_truth).sum(axis=1),
+                "incorrect_count": (ot_net_predictions != ot_truth).sum(axis=1),
+            })
+
+            # Variance computation
+            variance = entropy_variance(anne_prediction_stats, anne_number)
+            ot_variance = entropy_variance(anne_ot_prediction_stats, anne_number)
+            print("   Early Exit Entropy Variance", variance)
+            print("  Overtrained Entropy Variance", ot_variance)
+
+            # Accuracy Computation
+            accuracy = (anne_prediction_stats['anne_prediction'] == val_data["realclass"]).sum() / len(val_data) * 100
+            ot_accuracy = (anne_ot_prediction_stats['anne_prediction'] == val_data["realclass"]).sum() / len(val_data) * 100
+            print("   Early Exit Accuracy", accuracy)
+            print("  Overtrained Accuracy", ot_accuracy)
+
+            all_stats.append({
+                'anne_number': anne_number,
+                'accuracy': accuracy,
+                'ot_accuracy': ot_accuracy,
+                'entropy_var': variance,
+                'ot_entropy_var': ot_variance
+            })
+
+        net_stats = pandas.DataFrame(all_stats)
+        net_stats.to_csv(annes_stats_file)
+    else:
+        net_stats = pandas.read_csv(annes_stats_file)
+
+    # TODO: Plotting? Make a separate program for plotting?
 
 
 
@@ -225,4 +301,10 @@ def setup_parser(parser: argparse.ArgumentParser):
     parser.add_argument("-c", "--num-nets",
                         type=int, help="Size of component network pool",
                         default=300)
+    parser.add_argument("-n", "--num-ensembles",
+                        type=int, help="Number of ensembles to test",
+                        default=99)
+    parser.add_argument("-z", "--val-data-size",
+                        type=int, help="Number of points to use for validation",
+                        default=3000)
     parser.set_defaults(func=main)
