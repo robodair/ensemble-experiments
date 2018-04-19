@@ -37,7 +37,7 @@ def entropy_variance(stats: pandas.DataFrame, L: int):
     return E
 
 
-def train(train_df, test_df, save_dir, epochs, verbose, net_number, learn_rate):
+def train(train_df, test_df, save_dir, epochs, verbose, net_number, learn_rate, hidden_nodes, patience):
     save_net = save_dir / "net.h5"
     save_overtrained_net = save_dir / "overtrained_net.h5"
 
@@ -66,7 +66,7 @@ def train(train_df, test_df, save_dir, epochs, verbose, net_number, learn_rate):
         )
 
         model = Sequential([
-            Dense(20, input_shape=(2,), activation="sigmoid"),
+            Dense(hidden_nodes, input_shape=(2,), activation="sigmoid"),
             Dense(1, activation="sigmoid")
         ])
 
@@ -171,7 +171,7 @@ def main(args):
         print(f"GET NETWORK FOR {net_number}")
         nets.append(
             train(train_bag, test_bag, working_dir, args.epochs,
-                  args.verbose, net_number, args.learn_rate)
+                  args.verbose, net_number, args.learn_rate, args.hidden_nodes, args.patience)
         )
 
     # Run validation data through each net and save predictions for later analysis
@@ -309,4 +309,9 @@ def setup_parser(parser: argparse.ArgumentParser):
     parser.add_argument("-l", "--learn-rate",
                         type=float, help="Network learn rate",
                         default=0.8)
+    parser.add_argument("--hidden-nodes",
+                        type=int, help="Number of hidden nodes to use for the networks",
+                        default=20)
+    parser.add_argument("-p", "--patience",
+                        type=int, help="Patience (epochs) for early exit", default=2000)
     parser.set_defaults(func=main)

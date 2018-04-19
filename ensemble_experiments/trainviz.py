@@ -156,7 +156,7 @@ def main(args):
                                                               verbose=args.verbose)))
 
     pyplot.title(f"Optimal - {args.error_rate}% Data Error, "
-                 f"{op_epochs} Epochs, {op_metrics['acc']:.2f}% Accuracy")
+                 f"{op_epochs} Epochs, {op_metrics['acc'] * 100:.2f}% Accuracy")
     if args.save_dir:
         fig_name = f"{args.error_rate}-error_optimal_seed-{args.seed}_{time.strftime('%Y-%m-%d-%H-%M-%S')}.png"
         pyplot.savefig(args.save_dir / fig_name)
@@ -195,7 +195,7 @@ def main(args):
                                                               verbose=args.verbose)))
 
     plot_visualisation(vis_df, train_df,
-        f"Overtrained - {args.error_rate}% Data Error, {ot_epochs} Epochs, {ot_metrics['acc']:.2f}% Accuracy")
+        f"Overtrained - {args.error_rate}% Data Error, {ot_epochs} Epochs, {ot_metrics['acc']*100:.2f}% Accuracy")
 
     if args.save_dir:
         fig_name = f"{args.error_rate}-error_overtrained_seed-{args.seed}_{time.strftime('%Y-%m-%d-%H-%M-%S')}.png"

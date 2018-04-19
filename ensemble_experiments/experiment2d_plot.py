@@ -21,7 +21,7 @@ def main(args):
     ac_v_comp_ot.set_title("Overtrained")
     # Variance difference V Components by Error Rate
     vardiff_v_comp = pyplot.figure()
-    vardiff_v_comp.suptitle("Variance Difference Vs Number of Components")
+    vardiff_v_comp.suptitle("Variance Difference (Early Exit - Overtrained) Vs Number of Components")
     vardiff_v_comp_plot = vardiff_v_comp.add_subplot(111)
     # Varience V Components by Error Rate
     var_v_comp = pyplot.figure()
@@ -169,13 +169,13 @@ def main(args):
     var_v_comp_ot.legend(bbox_to_anchor=(1, 0.8))
     var_v_comp_ot.grid(linestyle=':')
 
-    ac_v_comp_early.set_ybound(0, 100)
-    ac_v_comp_ot.set_ybound(0, 100)
+    ac_v_comp_early.set_ybound(20, 100)
+    ac_v_comp_ot.set_ybound(20, 100)
     ac_v_comp_early.set_xbound(1, 99)
     ac_v_comp_ot.set_xbound(1, 99)
 
-    var_v_comp_early.set_ybound(0, 1)
-    var_v_comp_ot.set_ybound(0, 1)
+    var_v_comp_early.set_ybound(0.1, 0.7)
+    var_v_comp_ot.set_ybound(0.1, 0.7)
     var_v_comp_early.set_xbound(1, 99)
     var_v_comp_ot.set_xbound(1, 99)
 
