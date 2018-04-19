@@ -5,6 +5,7 @@ learning rate. An early exit callback stops training after 2000 epochs
 import argparse
 import time
 from pathlib import Path
+import sys
 
 import numpy as np
 
@@ -40,14 +41,15 @@ def plot_visualisation(vis_data, train_data, title):
         label="Classified as B"
     )
 
-    dv.plot_dataset(train_data)
+    if train_data is not None:
+        dv.plot_dataset(train_data)
     box = ax.get_position()
     ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     pyplot.title(title)
 
-    pyplot.pause(0.001)
+    pyplot.pause(0.1)
 
 
 class PlotDiscriminatorCallback(Callback):
@@ -74,7 +76,7 @@ class PlotDiscriminatorCallback(Callback):
 
 
 def main(args):
-    from keras.models import Sequential
+    from keras.models import Sequential, load_model
     from keras.layers import Dense
     from keras.optimizers import SGD
     from keras.callbacks import EarlyStopping
@@ -95,9 +97,24 @@ def main(args):
     # Gen uniform dataset for plotting distriminator
     vis_df = generate_uniform_data()
 
+    if args.show_net is not None:
+        model = load_model(args.show_net / 'net.h5')
+        ot_model = load_model(args.show_net / 'overtrained_net.h5')
+        vis_df["class"] = model.predict_classes(vis_df.as_matrix(columns=("x", "y")),
+                                            verbose=args.verbose)
+        plot_visualisation(vis_df, None, f"Optimal")
+        pyplot.figure()
+        vis_df["class"] = ot_model.predict_classes(vis_df.as_matrix(columns=("x", "y")),
+                                            verbose=args.verbose)
+        plot_visualisation(vis_df, None, f"Overtrained")
+        pyplot.show(block=True) # block till window is closed
+        sys.exit()
+
+
+
     stopper = EarlyStopping(
         monitor="val_acc",
-        patience=2000,
+        patience=args.patience,
         verbose=args.verbose,
     )
 
@@ -145,6 +162,7 @@ def main(args):
         pyplot.savefig(args.save_dir / fig_name)
 
     pyplot.figure() # New figure for Overtrain plotting
+    pyplot.pause(1)
 
     ot_epochs = op_epochs * 10
     print(f"Beginning Overtraining to {ot_epochs} epochs")
@@ -183,10 +201,13 @@ def main(args):
         fig_name = f"{args.error_rate}-error_overtrained_seed-{args.seed}_{time.strftime('%Y-%m-%d-%H-%M-%S')}.png"
         pyplot.savefig(args.save_dir / fig_name)
 
+    pyplot.pause(0.1)
     pyplot.show(block=True) # block till window is closed
 
 
 def setup_parser(parser: argparse.ArgumentParser):
+    parser.add_argument("--show-net",
+                        type=Path, help="Show the discriminators of the nets in the given directory")
     parser.add_argument("-v","--verbose",
                         type=int, help="Show training logs verbosely", default=0)
     parser.add_argument("-e","--epochs",
