@@ -174,8 +174,8 @@ def main(args):
     ac_v_comp_early.set_xbound(1, 99)
     ac_v_comp_ot.set_xbound(1, 99)
 
-    var_v_comp_early.set_ybound(0.1, 0.7)
-    var_v_comp_ot.set_ybound(0.1, 0.7)
+    var_v_comp_early.set_ybound(0, 0.7)
+    var_v_comp_ot.set_ybound(0, 0.7)
     var_v_comp_early.set_xbound(1, 99)
     var_v_comp_ot.set_xbound(1, 99)
 
