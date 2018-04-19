@@ -61,7 +61,7 @@ def train(train_df, test_df, save_dir, epochs, verbose, net_number, learn_rate, 
 
         stopper = EarlyStopping(
             monitor="val_acc",
-            patience=2000,
+            patience=patience,
             verbose=verbose,
         )
 
