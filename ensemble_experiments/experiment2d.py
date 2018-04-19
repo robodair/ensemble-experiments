@@ -88,6 +88,8 @@ def train(train_df, test_df, save_dir, epochs, verbose, net_number):
         end_time = time.time()
         print(f">> Overtrain Time: {end_time-train_time:.2f} seconds")
         print(f">>>> Total Time: {end_time-start_time:.2f} seconds")
+    # Avoid Memory Leak https://github.com/keras-team/keras/issues/2102
+    keras.backend.clear_session()
 
     return {
         "id": net_number,
@@ -151,6 +153,7 @@ def main(args):
 
     # Run validation data through each net and save predictions for later analysis
     from keras.models import load_model
+    import keras
     val_data_xy = val_data.as_matrix(columns=('x', 'y'))
 
     for net_dict in nets:
@@ -165,8 +168,6 @@ def main(args):
             )
             predictions.to_csv(validation_predictions_file)
             print(f"Saved Predictions for ANN {net_dict['id']} to {validation_predictions_file}")
-            del net
-            del predictions
 
             ot_net = load_model(net_dict["ot_net"])
             ot_predictions = pandas.DataFrame(
@@ -175,10 +176,11 @@ def main(args):
             )
             ot_predictions.to_csv(ot_validation_predictions_file)
             print(f"Saved OT Predictions for OT ANN {net_dict['id']} to {ot_validation_predictions_file}")
-            del ot_net
-            del ot_predictions
         else:
             print(f"Already have predictions for ANN {net_dict['id']}")
+
+        # Avoid Memory Leak https://github.com/keras-team/keras/issues/2102
+        keras.backend.clear_session()
 
 
     # Work out which ANN's to use for each ANNE
