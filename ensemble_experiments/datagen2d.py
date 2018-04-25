@@ -46,7 +46,7 @@ def generate_uniform_data():
     return data
 
 
-def generate_data(count: int, error: int, seed: int) -> pd.DataFrame:
+def generate_data(count: int, error: int, seed: int = None) -> pd.DataFrame:
     """
     Generate a 2D dataset with two classes.
 
@@ -58,7 +58,8 @@ def generate_data(count: int, error: int, seed: int) -> pd.DataFrame:
     Returns:
         A pandas dataframe with columns for x, y, class, and real class
     """
-    np.random.seed(seed)
+    if seed is not None:
+        np.random.seed(seed)
     data = pd.DataFrame()
 
     data['x'] = np.random.random(count)

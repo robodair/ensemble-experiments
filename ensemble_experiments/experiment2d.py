@@ -132,14 +132,14 @@ def main(args):
 
     data_csv = ratedir / "data.csv"
     if not data_csv.exists():
-        data = dg.generate_data(args.data_size, args.error_rate, 2017)
+        data = dg.generate_data(args.data_size, args.error_rate)
         data.to_csv(data_csv)
     else:
         data = pandas.read_csv(data_csv)
 
     val_data_csv = ratedir / "validation.csv"
     if not val_data_csv.exists():
-        val_data = dg.generate_data(args.val_data_size, args.error_rate, 2018)
+        val_data = dg.generate_data(args.val_data_size, args.error_rate)
         val_data.to_csv(val_data_csv)
     else:
         val_data = pandas.read_csv(val_data_csv)
