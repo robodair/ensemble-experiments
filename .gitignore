@@ -1,7 +1,6 @@
 # Custom
 .vscode/
 .pytest_cache/
-experiment-*/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
