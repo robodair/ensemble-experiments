@@ -29,3 +29,13 @@ Experiment 3:
 5000 patience
 ee ex2d experiment-3 -l 0.2 -p 5000 -r {10,20,30,40}
 ~1.5-2 Days train time if all error rates run in parallel
+
+Experiment 4:
+Control Experiment (No Bagging)
+300 Data points
+0.2 Learning Rate
+20 Hidden nodes
+3000 Validation points
+5000 patience
+ee ex2d experiment-4 --control -l 0.2 -p 5000 -r {10,20,30,40}
+~1.5-2 Days train time if all error rates run in parallel
