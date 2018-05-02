@@ -147,7 +147,7 @@ def main(args):
     train_data = data[::2]
     test_data = data[1::2]
 
-    nets = [] # list of dicts of paths to load
+    net_dicts = [] # list of dicts of paths to load
 
     for net_number in range(1, args.num_nets + 1):
         print(f"GET DATA FOR {net_number}")
@@ -160,16 +160,22 @@ def main(args):
         if save_train.exists():
             train_bag = pandas.read_csv(save_train)
         else:
-            train_bag = train_data.sample(len(train_data), replace=True)
+            if not args.control:
+                train_bag = train_data.sample(len(train_data), replace=True)
+            else:
+                train_bag = train_data
             train_bag.to_csv(save_train)
         if save_test.exists():
             test_bag = pandas.read_csv(save_test)
         else:
-            test_bag = test_data.sample(len(test_data), replace=True)
+            if not args.control:
+                test_bag = test_data.sample(len(test_data), replace=True)
+            else:
+                test_bag = test_data
             test_bag.to_csv(save_test)
 
         print(f"GET NETWORK FOR {net_number}")
-        nets.append(
+        net_dicts.append(
             train(train_bag, test_bag, working_dir, args.epochs,
                   args.verbose, net_number, args.learn_rate, args.hidden_nodes, args.patience)
         )
@@ -179,7 +185,7 @@ def main(args):
     import keras
     val_data_xy = val_data.as_matrix(columns=('x', 'y'))
 
-    for net_dict in nets:
+    for net_dict in net_dicts:
         validation_predictions_file = net_dict["dir"] / "val_predictions.csv"
         ot_validation_predictions_file = net_dict["dir"] / "overtrained_val_predictions.csv"
 
@@ -282,9 +288,6 @@ def main(args):
     else:
         net_stats = pandas.read_csv(annes_stats_file)
 
-    # TODO: Plotting? Make a separate program for plotting?
-
-
 
 def setup_parser(parser: argparse.ArgumentParser):
     parser.add_argument("save_dir",
@@ -314,4 +317,7 @@ def setup_parser(parser: argparse.ArgumentParser):
                         default=20)
     parser.add_argument("-p", "--patience",
                         type=int, help="Patience (epochs) for early exit", default=2000)
+    parser.add_argument("--control", action="store_true",
+                        help="Conduct a control experiment. No bagging will be done."
+                             "The initial weights will be the only thing that make the networks diverse")
     parser.set_defaults(func=main)
