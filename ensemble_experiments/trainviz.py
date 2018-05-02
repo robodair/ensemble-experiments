@@ -11,8 +11,6 @@ import numpy as np
 
 import matplotlib.pyplot as pyplot
 
-from keras.callbacks import Callback
-
 from ensemble_experiments.datagen2d import generate_data, CLASS_A, CLASS_B, generate_uniform_data
 import ensemble_experiments.dataviz as dv
 
@@ -52,34 +50,33 @@ def plot_visualisation(vis_data, train_data, title):
     pyplot.pause(0.1)
 
 
-class PlotDiscriminatorCallback(Callback):
-    """
-    Keras Callback for plotting at specified epoch increments
-    """
-
-    def __init__(self, delta, model, vis_df, train_df, start_time, title):
-        self.delta = delta
-        self.model = model
-        self.vis_df = vis_df
-        self.train_df = train_df
-        self.start_time = start_time
-        self.title = title
-
-    def on_epoch_end(self, epoch, logs=None):
-        if epoch % self.delta == 0:
-            print(f"Plotting for epoch {epoch}, val_acc {logs['val_acc'] * 100:.3f}, at "
-                  f"{time.time() - self.start_time:.2f} secs")
-            self.vis_df["class"] = self.model.predict_classes(
-                self.vis_df.as_matrix(columns=("x", "y")))
-            plot_visualisation(self.vis_df, self.train_df, self.title)
-
-
-
 def main(args):
     from keras.models import Sequential, load_model
     from keras.layers import Dense
     from keras.optimizers import SGD
     from keras.callbacks import EarlyStopping
+    from keras.callbacks import Callback
+
+    class PlotDiscriminatorCallback(Callback):
+        """
+        Keras Callback for plotting at specified epoch increments
+        """
+
+        def __init__(self, delta, model, vis_df, train_df, start_time, title):
+            self.delta = delta
+            self.model = model
+            self.vis_df = vis_df
+            self.train_df = train_df
+            self.start_time = start_time
+            self.title = title
+
+        def on_epoch_end(self, epoch, logs=None):
+            if epoch % self.delta == 0:
+                print(f"Plotting for epoch {epoch}, val_acc {logs['val_acc'] * 100:.3f}, at "
+                    f"{time.time() - self.start_time:.2f} secs")
+                self.vis_df["class"] = self.model.predict_classes(
+                    self.vis_df.as_matrix(columns=("x", "y")))
+                plot_visualisation(self.vis_df, self.train_df, self.title)
 
     pyplot.ion()
 
