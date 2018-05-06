@@ -85,7 +85,9 @@ def main(args):
     # Gen dataset of specified size
     data = generate_data(args.data_size, args.error_rate, args.seed)
     train_df = data[::2]
+    train_df = train_df.sample(len(train_df), replace=True, random_state=args.bag_seed)
     test_df = data[1::2]
+    test_df = test_df.sample(len(test_df), replace=True, random_state=args.bag_seed)
     train_classes = train_df["class"].values
     test_classes = test_df["class"].values
     train_data = train_df.as_matrix(columns=("x", "y"))
@@ -152,10 +154,14 @@ def main(args):
     op_metrics = dict(zip(model.metrics_names, model.evaluate(test_data, test_classes_real,
                                                               verbose=args.verbose)))
 
+    vis_df["class"] = model.predict_classes(vis_df.as_matrix(columns=("x", "y")))
+    plot_visualisation(vis_df, train_df,
+        f"Optimal - {args.error_rate}% Data Error, {op_epochs} Epochs, {op_metrics['acc']*100:.2f}% Accuracy")
     pyplot.title(f"Optimal - {args.error_rate}% Data Error, "
                  f"{op_epochs} Epochs, {op_metrics['acc'] * 100:.2f}% Accuracy")
+    pyplot.draw()
     if args.save_dir:
-        fig_name = f"{args.error_rate}-error_optimal_seed-{args.seed}_{time.strftime('%Y-%m-%d-%H-%M-%S')}.png"
+        fig_name = f"{args.error_rate}-error_optimal_seed-{args.seed}_bag-seed-{args.bag_seed}_{time.strftime('%Y-%m-%d-%H-%M-%S')}.png"
         pyplot.savefig(args.save_dir / fig_name)
 
     pyplot.figure() # New figure for Overtrain plotting
@@ -191,14 +197,15 @@ def main(args):
     ot_metrics = dict(zip(model.metrics_names, model.evaluate(test_data, test_classes_real,
                                                               verbose=args.verbose)))
 
+    vis_df["class"] = model.predict_classes(vis_df.as_matrix(columns=("x", "y")))
     plot_visualisation(vis_df, train_df,
         f"Overtrained - {args.error_rate}% Data Error, {ot_epochs} Epochs, {ot_metrics['acc']*100:.2f}% Accuracy")
 
     if args.save_dir:
-        fig_name = f"{args.error_rate}-error_overtrained_seed-{args.seed}_{time.strftime('%Y-%m-%d-%H-%M-%S')}.png"
+        fig_name = f"{args.error_rate}-error_overtrained_seed-{args.seed}_bag-seed-{args.bag_seed}_{time.strftime('%Y-%m-%d-%H-%M-%S')}.png"
         pyplot.savefig(args.save_dir / fig_name)
 
-    pyplot.pause(0.1)
+    pyplot.pause(1)
     pyplot.show(block=True) # block till window is closed
 
 
@@ -212,7 +219,7 @@ def setup_parser(parser: argparse.ArgumentParser):
     parser.add_argument("-x","--plot-delta",
                         type=int, help="Plot after this many epochs", default=500)
     parser.add_argument("-r","--error-rate",
-                        type=int, help="Error rate to use", default=10)
+                        type=int, help="Error rate to use", default=20)
     parser.add_argument("-d", "--data-size",
                         type=int, help="Size of train/test dataset", default=300)
     parser.add_argument("-l", "--learn-rate",
@@ -227,5 +234,7 @@ def setup_parser(parser: argparse.ArgumentParser):
                         type=Path, help="Directory in which to save optimal and overtrained plots")
     parser.add_argument("-q", "--quiet",
                         action="store_true", help="Don't show the plots")
+    parser.add_argument("-b", "--bag-seed",
+                        type=int, help="Seed to use for bagging", default=1)
 
     parser.set_defaults(func=main)
