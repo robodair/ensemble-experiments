@@ -13,15 +13,15 @@ def main(args):
     pyplot.ion()
 
     # Accuracy Vs Num Components by Error Rate
-    ac_v_comp_fig = pyplot.figure()
+    ac_v_comp_fig = pyplot.figure(figsize=(16,9))
     ac_v_comp_fig.suptitle("Accuracy Vs Number of Component Nets by Error Rate")
     ac_v_comp = ac_v_comp_fig.add_subplot(111)
     # Variance difference V Components by Error Rate
-    vardiff_v_comp = pyplot.figure()
-    vardiff_v_comp.suptitle("Variance Difference (Early Exit - Overtrained) Vs Number of Components")
-    vardiff_v_comp_plot = vardiff_v_comp.add_subplot(111)
+    vardiff_v_comp_fig = pyplot.figure(figsize=(16,9))
+    vardiff_v_comp_fig.suptitle("Variance Difference (Early Exit - Overtrained) Vs Number of Components")
+    vardiff_v_comp = vardiff_v_comp_fig.add_subplot(111)
     # Varience V Components by Error Rate
-    var_v_comp_fig = pyplot.figure()
+    var_v_comp_fig = pyplot.figure(figsize=(16,9))
     var_v_comp_fig.suptitle("Variance Vs Number of Components")
     var_v_comp = var_v_comp_fig.add_subplot(111)
 
@@ -92,7 +92,7 @@ def main(args):
 
         # Variance Difference
         vardiff = entropy_var - ot_entropy_var
-        vardiff_v_comp_plot.plot(
+        vardiff_v_comp.plot(
             vardiff,
             marker=marker,
             label=f"Err {rate}",
@@ -107,7 +107,7 @@ def main(args):
             ),
             regression_sample
         )
-        vardiff_v_comp_plot.plot(
+        vardiff_v_comp.plot(
             regression_sample,
             vardiff_regression,
             linestyle=':',
@@ -165,10 +165,10 @@ def main(args):
     ac_v_comp.grid(linestyle=':')
     ac_v_comp.set_xlabel("Number of Component Networks")
     ac_v_comp.set_ylabel("Accuracy")
-    vardiff_v_comp_plot.legend(bbox_to_anchor=(1, 0.8))
-    vardiff_v_comp_plot.grid(linestyle=':')
-    vardiff_v_comp_plot.set_xlabel("Number of Component Networks")
-    vardiff_v_comp_plot.set_ylabel("Variance Difference (OverTrained - EarlyExit)")
+    vardiff_v_comp.legend(bbox_to_anchor=(1, 0.8))
+    vardiff_v_comp.grid(linestyle=':')
+    vardiff_v_comp.set_xlabel("Number of Component Networks")
+    vardiff_v_comp.set_ylabel("Variance Difference (OverTrained - EarlyExit)")
     var_v_comp.legend(bbox_to_anchor=(1, 0.8))
     var_v_comp.grid(linestyle=':')
     var_v_comp.set_xlabel("Number of Component Networks")
@@ -180,6 +180,16 @@ def main(args):
 
         var_v_comp.set_ybound(0, 0.7)
         var_v_comp.set_xbound(1, 99)
+
+    if args.output_dir is not None:
+        if args.output_prefix is None:
+            prefix = ""
+        else:
+            prefix = args.output_prefix + "-"
+        args.output_dir.mkdir(exist_ok=True, parents=True)
+        ac_v_comp_fig.savefig(args.output_dir / f"{prefix}ac_v_comp.png")
+        vardiff_v_comp_fig.savefig(args.output_dir / f"{prefix}vardiff_v_comp.png")
+        var_v_comp_fig.savefig(args.output_dir / f"{prefix}var_v_comp.png")
 
     pyplot.show(block=True) # block till window is closed
 
@@ -203,5 +213,9 @@ def setup_parser(parser: argparse.ArgumentParser):
                         type=int, default=1)
     parser.add_argument("-x", "--fix-axes", action='store_true',
                         help="Fix axes sizes to sensible defaults, useful for plot comparison")
+    parser.add_argument("-o", "--output-dir", type=Path, default=None,
+                        help="Save plots to this directory")
+    parser.add_argument("-p", "--output-prefix", default=None,
+                        help="Prefix output images with this string")
 
     parser.set_defaults(func=main)
